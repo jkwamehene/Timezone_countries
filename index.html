@@ -1,131 +1,141 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global System Setup</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dynamic Country/Timezone Config</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
+    select, button { padding: 0.75rem 1rem; margin: 0.5rem 0.25rem 0 0; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; }
+    button { background: #3b82f6; color: white; border: none; cursor: pointer; }
+    button:hover { background: #2563eb; }
+    .info { background: #f0f9ff; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+    .loading { opacity: 0.6; }
+    code { background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-family: 'Courier New', monospace; font-size: 0.875rem; }
+    h1 { color: #1f2937; }
+    h2 { color: #374151; }
+    .status { font-weight: bold; color: #059669; }
+  </style>
 </head>
-<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4 font-sans">
+<body>
+  <h1>🌍 Dynamic Country/Timezone Setup</h1>
+  <p>Select country → Auto-loads currencies & timezones → Converts UTC time.</p>
 
-    <div class="max-w-xl w-full bg-white shadow-2xl rounded-2xl overflow-hidden">
-        <div class="bg-emerald-600 p-6">
-            <h1 class="text-white text-2xl font-bold">System Localization</h1>
-            <p id="status-msg" class="text-emerald-100 text-sm italic">Syncing with global servers...</p>
-        </div>
-
-        <div class="p-8 space-y-6">
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Country of Origin</label>
-                <select id="country-select" class="w-full"></select>
-            </div>
-
-            <div>
-                <label class="block text-sm font-semibold text-gray-700 mb-2">Timezone</label>
-                <select id="timezone-select" class="w-full p-3 border border-gray-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-emerald-500 transition-all"></select>
-            </div>
-
-            <div class="p-6 bg-slate-50 border-l-4 border-emerald-500 rounded-r-lg">
-                <label class="block text-xs uppercase tracking-widest text-slate-500 font-bold mb-2">Current System Time</label>
-                <div id="clock-display" class="text-xl md:text-2xl font-semibold text-slate-800">
-                    Loading time...
-                </div>
-                <div id="currency-info" class="text-sm text-emerald-600 font-medium mt-1"></div>
-            </div>
-
-            <button onclick="alert('Configuration Saved Successfully!')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg active:scale-[0.98]">
-                Complete System Setup
-            </button>
-        </div>
+  <div>
+    <label>🇬🇭 Country: 
+      <select id="countrySelect" onchange="loadCountryData()">
+        <option value="">Loading countries...</option>
+      </select>
+    </label>
+    
+    <div id="info" class="info" style="display:none;">
+      <strong>Currency:</strong> <span id="currency"></span><br>
+      <strong>Timezones:</strong> <span id="timezones"></span><br>
+      <strong>Selected TZ:</strong> 
+      <select id="timeZoneSelect"></select>
     </div>
+    
+    <button onclick="convertTime()">🔄 Convert UTC Now</button>
+  </div>
 
-    <script>
-        let countriesData = [];
-        let choicesInstance;
-        const countryEl = document.getElementById('country-select');
-        const tzSelect = document.getElementById('timezone-select');
-        const clockDisplay = document.getElementById('clock-display');
-        const currencyInfo = document.getElementById('currency-info');
+  <div id="result"></div>
 
-        choicesInstance = new Choices(countryEl, { searchEnabled: true, itemSelectText: '' });
+  <script>
+    // Load all countries from REST Countries API (free, no key)
+    async function loadCountries() {
+      try {
+        const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,currencies,timezones');
+        const countries = await res.json();
+        
+        const select = document.getElementById('countrySelect');
+        select.innerHTML = '<option value="">Select Country</option>';
+        
+        // Sort alphabetically
+        countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
+        
+        countries.forEach(country => {
+          const option = document.createElement('option');
+          option.value = country.cca2;  // ISO code like "GH"
+          option.textContent = country.name.common;
+          select.appendChild(option);
+        });
+        
+        document.body.classList.remove('loading');
+      } catch (err) {
+        document.getElementById('countrySelect').innerHTML = '<option>API Error - Load fallback</option>';
+        console.error('API failed:', err);
+      }
+    }
 
-        async function initSystem() {
-            try {
-                const response = await fetch('data.json');
-                countriesData = await response.json();
-                
-                const list = countriesData.map(c => ({ value: c.code, label: `${c.name} (${c.code})` }))
-                             .sort((a, b) => a.label.localeCompare(b.label));
-                choicesInstance.setChoices(list, 'value', 'label', true);
+    // Load country details (currencies, timezones)
+    async function loadCountryData() {
+      const countryCode = document.getElementById('countrySelect').value;
+      const infoDiv = document.getElementById('info');
+      
+      if (!countryCode) {
+        infoDiv.style.display = 'none';
+        return;
+      }
+      
+      try {
+        infoDiv.classList.add('loading');
+        const res = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}?fields=currencies,timezones,name`);
+        const [country] = await res.json();
+        
+        // Currency
+        const currencies = country.currencies;
+        const currencyList = Object.values(currencies).map(c => `${c.name} (${c.code})`).join(', ');
+        document.getElementById('currency').textContent = currencyList || 'N/A';
+        
+        // Timezones
+        const tzs = country.timezones.join(', ');
+        document.getElementById('timezones').textContent = tzs || 'N/A';
+        
+        // Populate timezone dropdown (pick first as default)
+        const tzSelect = document.getElementById('timeZoneSelect');
+        tzSelect.innerHTML = '';
+        country.timezones.forEach(tz => {
+          const option = document.createElement('option');
+          option.value = tz;
+          option.textContent = tz;
+          tzSelect.appendChild(option);
+        });
+        
+        infoDiv.style.display = 'block';
+        infoDiv.classList.remove('loading');
+      } catch (err) {
+        console.error('Country load failed:', err);
+      }
+    }
 
-                // Auto-detect location
-                const geoRes = await fetch('https://ipapi.co/json/');
-                const geoData = await geoRes.json();
-                updateUI(geoData.country_code, geoData.timezone);
-            } catch (err) {
-                console.error("Initialization failed", err);
-            }
-        }
+    // Convert UTC to selected timezone
+    function convertTime() {
+      const utcNow = new Date().toISOString();
+      const tz = document.getElementById('timeZoneSelect').value;
+      
+      if (!tz) {
+        document.getElementById('result').innerHTML = '<p style="color:orange;">Select a country first!</p>';
+        return;
+      }
+      
+      const local = new Date(utcNow).toLocaleString('en-GB', {
+        timeZone: tz,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+      });
+      
+      document.getElementById('result').innerHTML = `
+        <div class="info">
+          <strong>🌐 UTC:</strong> ${utcNow.slice(0,19).replace('T',' ')}Z<br>
+          <strong>📍 ${tz}:</strong> ${local}<br>
+          <code>new Date().toLocaleString({ timeZone: '${tz}' })</code>
+          <br><small>Dynamic via restcountries.com API</small>
+        </div>
+      `;
+    }
 
-        function updateUI(countryCode, preferredTimezone = null) {
-            const country = countriesData.find(c => c.code === countryCode);
-            if (!country) return;
-
-            choicesInstance.setChoiceByValue(country.code);
-            currencyInfo.innerText = `Standard Currency: ${country.currency}`;
-
-            tzSelect.innerHTML = '';
-            country.zones.forEach(zone => {
-                let opt = new Option(zone, zone);
-                if (zone === preferredTimezone) opt.selected = true;
-                tzSelect.add(opt);
-            });
-            
-            updateClock(); 
-        }
-
-        function updateClock() {
-            const selectedZone = tzSelect.value;
-            if (!selectedZone) return;
-
-            const now = new Date();
-            
-            // Format: Monday, 2 March 2026, 2:03 pm
-            const options = {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-                timeZone: selectedZone
-            };
-
-            const formatter = new Intl.DateTimeFormat('en-GB', options);
-            let parts = formatter.formatToParts(now);
-            
-            // Custom construction to match your EXACT format (comma placement)
-            const weekday = parts.find(p => p.type === 'weekday').value;
-            const day = parts.find(p => p.type === 'day').value;
-            const month = parts.find(p => p.type === 'month').value;
-            const year = parts.find(p => p.type === 'year').value;
-            const hour = parts.find(p => p.type === 'hour').value;
-            const minute = parts.find(p => p.type === 'minute').value;
-            const dayPeriod = parts.find(p => p.type === 'dayPeriod').value.toLowerCase();
-
-            clockDisplay.innerText = `${weekday}, ${day} ${month} ${year}, ${hour}:${minute} ${dayPeriod}`;
-        }
-
-        // Run clock every second
-        setInterval(updateClock, 1000);
-
-        countryEl.addEventListener('change', (e) => updateUI(e.detail.value));
-        tzSelect.addEventListener('change', updateClock);
-
-        initSystem();
-    </script>
+    // Init
+    loadCountries();
+  </script>
 </body>
 </html>
