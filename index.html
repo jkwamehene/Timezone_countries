@@ -3,138 +3,157 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dynamic Country/Timezone Config</title>
+  <title>Country of Origin → Timezone Config</title>
   <style>
     body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
     select, button { padding: 0.75rem 1rem; margin: 0.5rem 0.25rem 0 0; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; }
-    button { background: #3b82f6; color: white; border: none; cursor: pointer; }
-    button:hover { background: #2563eb; }
-    .info { background: #f0f9ff; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #3b82f6; }
+    button { background: #10b981; color: white; border: none; cursor: pointer; }
+    button:hover { background: #059669; }
+    .info { background: #ecfdf5; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #10b981; }
     .loading { opacity: 0.6; }
     code { background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-family: 'Courier New', monospace; font-size: 0.875rem; }
     h1 { color: #1f2937; }
-    h2 { color: #374151; }
+    h2 { color: #374151; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem; }
     .status { font-weight: bold; color: #059669; }
+    .flag { font-size: 1.5rem; margin-right: 0.5rem; }
   </style>
 </head>
 <body>
-  <h1>🌍 Dynamic Country/Timezone Setup</h1>
-  <p>Select country → Auto-loads currencies & timezones → Converts UTC time.</p>
+  <h1>🌍 Country of Origin Setup</h1>
+  <p>Select your <strong>Country of Origin</strong> → System auto-detects country code → Loads currencies & timezones → Converts all times.</p>
 
   <div>
-    <label>🇬🇭 Country: 
+    <label><strong>🏠 Country of Origin:</strong><br>
       <select id="countrySelect" onchange="loadCountryData()">
-        <option value="">Loading countries...</option>
+        <option value="">🔄 Loading 250+ countries...</option>
       </select>
     </label>
     
     <div id="info" class="info" style="display:none;">
-      <strong>Currency:</strong> <span id="currency"></span><br>
-      <strong>Timezones:</strong> <span id="timezones"></span><br>
-      <strong>Selected TZ:</strong> 
-      <select id="timeZoneSelect"></select>
+      <div id="countryFlag" class="flag"></div>
+      <strong>Country Code:</strong> <span id="countryCode"></span><br>
+      <strong>💰 Currency:</strong> <span id="currency"></span><br>
+      <strong>🕐 Timezones:</strong> <span id="timezones"></span><br>
+      <strong>Selected Timezone:</strong> 
+      <select id="timeZoneSelect" onchange="convertTime()"></select>
     </div>
     
-    <button onclick="convertTime()">🔄 Convert UTC Now</button>
+    <button onclick="convertTime()">🔄 Show Local Time</button>
   </div>
 
   <div id="result"></div>
 
+  <h2>How it Works</h2>
+  <ul>
+    <li>Country dropdown uses <code>https://restcountries.com</code> API (dynamic, free)</li>
+    <li>Detects ISO code (e.g. "GH") → Fetches currencies/timezones</li>
+    <li>Auto-converts UTC timestamps system-wide</li>
+  </ul>
+
   <script>
-    // Load all countries from REST Countries API (free, no key)
+    let currentCountryData = null;
+
+    // Load countries with flags
     async function loadCountries() {
       try {
-        const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,currencies,timezones');
+        const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,cca3,flag,currencies,timezones');
         const countries = await res.json();
         
         const select = document.getElementById('countrySelect');
-        select.innerHTML = '<option value="">Select Country</option>';
+        select.innerHTML = '<option value="">Select Country of Origin</option>';
         
-        // Sort alphabetically
         countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
         
         countries.forEach(country => {
           const option = document.createElement('option');
-          option.value = country.cca2;  // ISO code like "GH"
-          option.textContent = country.name.common;
+          option.value = country.cca2;  // ISO alpha-2 code: "GH", "ES"
+          option.textContent = `${country.flag} ${country.name.common}`;
           select.appendChild(option);
         });
         
-        document.body.classList.remove('loading');
       } catch (err) {
-        document.getElementById('countrySelect').innerHTML = '<option>API Error - Load fallback</option>';
-        console.error('API failed:', err);
+        document.getElementById('countrySelect').innerHTML = '<option>🌐 Network Error</option>';
       }
     }
 
-    // Load country details (currencies, timezones)
+    // Load details for selected country
     async function loadCountryData() {
-      const countryCode = document.getElementById('countrySelect').value;
+      const countryCode = document.getElementById('countrySelect').value;  // "GH"
       const infoDiv = document.getElementById('info');
       
       if (!countryCode) {
         infoDiv.style.display = 'none';
+        document.getElementById('result').innerHTML = '';
         return;
       }
       
       try {
         infoDiv.classList.add('loading');
-        const res = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}?fields=currencies,timezones,name`);
+        const res = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}?fields=name,cca2,cca3,flag,currencies,timezones`);
         const [country] = await res.json();
+        currentCountryData = country;
+        
+        // Flag emoji
+        document.getElementById('countryFlag').innerHTML = country.flag;
+        
+        // Country codes
+        document.getElementById('countryCode').textContent = `${country.cca2} / ${country.cca3}`;
         
         // Currency
         const currencies = country.currencies;
-        const currencyList = Object.values(currencies).map(c => `${c.name} (${c.code})`).join(', ');
-        document.getElementById('currency').textContent = currencyList || 'N/A';
+        const currencyList = currencies ? 
+          Object.entries(currencies).map(([code, c]) => `${c.name} (${code})`).join(', ') : 
+          'N/A';
+        document.getElementById('currency').textContent = currencyList;
         
-        // Timezones
-        const tzs = country.timezones.join(', ');
-        document.getElementById('timezones').textContent = tzs || 'N/A';
-        
-        // Populate timezone dropdown (pick first as default)
+        // Timezones dropdown
+        const tzs = country.timezones || [];
         const tzSelect = document.getElementById('timeZoneSelect');
         tzSelect.innerHTML = '';
-        country.timezones.forEach(tz => {
+        tzs.forEach(tz => {
           const option = document.createElement('option');
           option.value = tz;
           option.textContent = tz;
           tzSelect.appendChild(option);
         });
         
+        // Auto-convert on load
         infoDiv.style.display = 'block';
         infoDiv.classList.remove('loading');
+        convertTime();
+        
       } catch (err) {
         console.error('Country load failed:', err);
       }
     }
 
-    // Convert UTC to selected timezone
+    // Convert & display
     function convertTime() {
-      const utcNow = new Date().toISOString();
-      const tz = document.getElementById('timeZoneSelect').value;
-      
-      if (!tz) {
-        document.getElementById('result').innerHTML = '<p style="color:orange;">Select a country first!</p>';
+      if (!currentCountryData || !currentCountryData.timezones?.length) {
+        document.getElementById('result').innerHTML = '<p style="color:orange;">Select Country of Origin first!</p>';
         return;
       }
       
-      const local = new Date(utcNow).toLocaleString('en-GB', {
+      const utcNow = new Date();
+      const tz = document.getElementById('timeZoneSelect').value;
+      
+      const local = utcNow.toLocaleString('en-GB', {
         timeZone: tz,
         year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZoneName: 'short'
       });
       
       document.getElementById('result').innerHTML = `
         <div class="info">
-          <strong>🌐 UTC:</strong> ${utcNow.slice(0,19).replace('T',' ')}Z<br>
-          <strong>📍 ${tz}:</strong> ${local}<br>
-          <code>new Date().toLocaleString({ timeZone: '${tz}' })</code>
-          <br><small>Dynamic via restcountries.com API</small>
+          <strong>🌐 UTC (Server):</strong> ${utcNow.toISOString().slice(0,19).replace('T',' ')}Z<br>
+          <strong>📱 Client (${tz}):</strong> ${local}<br>
+          <code>getTimeZoneByCountryCode('${currentCountryData.cca2}')</code>
         </div>
       `;
     }
 
-    // Init
+    // Start
     loadCountries();
   </script>
 </body>
