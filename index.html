@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global System Configuration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-10">
+    <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
+        <h2 class="text-2xl font-bold mb-6 text-gray-800">System Setup</h2>
+        
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">Select Country</label>
+            <select id="country" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">-- Choose a Country --</option>
+                <option value="US" data-currency="USD (US Dollar)" data-zones='["America/New_York", "America/Chicago", "America/Los_Angeles"]'>United States</option>
+                <option value="GB" data-currency="GBP (British Pound)" data-zones='["Europe/London"]'>United Kingdom</option>
+                <option value="GH" data-currency="GHS (Ghanaian Cedi)" data-zones='["Africa/Accra"]'>Ghana</option>
+                <option value="DE" data-currency="EUR (Euro)" data-zones='["Europe/Berlin"]'>Germany</option>
+                <option value="JP" data-currency="JPY (Japanese Yen)" data-zones='["Asia/Tokyo"]'>Japan</option>
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700">System Currency (Auto)</label>
+            <input type="text" id="currency" readonly class="mt-1 block w-full p-2 bg-gray-50 border border-gray-200 text-gray-500 rounded-md" placeholder="Select a country first...">
+        </div>
+
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700">Available Timezones</label>
+            <select id="timezone" disabled class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-50">
+                <option>Select a country first...</option>
+            </select>
+        </div>
+
+        <button onclick="alert('System Settings Saved!')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">Save Configuration</button>
+    </div>
+
+    <script>
+        const countryEl = document.getElementById('country');
+        const currencyEl = document.getElementById('currency');
+        const timezoneEl = document.getElementById('timezone');
+
+        countryEl.addEventListener('change', function() {
+            const selected = this.options[this.selectedIndex];
+            
+            if (this.value) {
+                // 1. Update Currency
+                currencyEl.value = selected.getAttribute('data-currency');
+                
+                // 2. Update Timezones
+                const zones = JSON.parse(selected.getAttribute('data-zones'));
+                timezoneEl.innerHTML = '';
+                zones.forEach(zone => {
+                    let opt = new Option(zone, zone);
+                    timezoneEl.add(opt);
+                });
+                
+                timezoneEl.disabled = false;
+                timezoneEl.classList.remove('bg-gray-50');
+            } else {
+                currencyEl.value = '';
+                timezoneEl.disabled = true;
+                timezoneEl.innerHTML = '<option>Select a country first...</option>';
+            }
+        });
+    </script>
+</body>
+</html>
