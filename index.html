@@ -1,183 +1,749 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pro Country/Timezone Config (USA Multi-Zone Ready)</title>
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
-    select, button { padding: 0.75rem 1rem; margin: 0.5rem 0.25rem 0 0; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; }
-    button { background: #8b5cf6; color: white; border: none; cursor: pointer; }
-    button:hover { background: #7c3aed; }
-    .info { background: #f3e8ff; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #8b5cf6; }
-    .usa-note { background: #fef3c7; border-left-color: #f59e0b; margin-top: 1rem; padding: 1rem; border-radius: 0.5rem; }
-    .loading { opacity: 0.6; }
-    code { background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-family: 'Courier New', monospace; }
-    h1 { color: #1f2937; }
-    h2 { color: #374151; border-bottom: 2px solid #8b5cf6; padding-bottom: 0.5rem; }
-    .flag { font-size: 1.5rem; margin-right: 0.5rem; }
-    .status { font-weight: bold; color: #7c2d12; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Country Selector</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --white: #ffffff;
+    --border: #e2e6f0;
+    --accent: #2563eb;
+    --accent-light: #eff4ff;
+    --accent2: #059669;
+    --accent2-light: #ecfdf5;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-dim: #94a3b8;
+    --shadow: 0 4px 24px rgba(15,23,42,0.08);
+    --shadow-lg: 0 12px 48px rgba(15,23,42,0.14);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  /* ── MODAL OVERLAY (as it would appear on your site) ── */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .modal {
+    background: var(--white);
+    border-radius: 20px;
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+    animation: slideUp 0.35s cubic-bezier(0.34,1.2,0.64,1);
+  }
+
+  .modal-top {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);
+    padding: 32px 32px 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .modal-top::after {
+    content: '🌍';
+    position: absolute;
+    right: 24px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 64px;
+    opacity: 0.15;
+  }
+
+  .modal-top h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 22px;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 6px;
+  }
+
+  .modal-top p {
+    font-size: 13px;
+    color: rgba(255,255,255,0.7);
+    line-height: 1.5;
+  }
+
+  .modal-body { padding: 28px 32px 32px; }
+
+  /* Search */
+  .search-wrap {
+    position: relative;
+    margin-bottom: 14px;
+  }
+
+  .search-wrap svg {
+    position: absolute;
+    left: 14px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    pointer-events: none;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    padding: 13px 14px 13px 42px;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text);
+    background: var(--bg);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .search-wrap input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    background: white;
+  }
+
+  .search-wrap input::placeholder { color: var(--text-dim); }
+
+  /* Dropdown list */
+  .country-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    background: white;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .country-list::-webkit-scrollbar { width: 4px; }
+  .country-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .country-option {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(226,230,240,0.5);
+    transition: background 0.12s;
+  }
+
+  .country-option:last-child { border-bottom: none; }
+  .country-option:hover { background: var(--accent-light); }
+
+  .country-option.selected {
+    background: var(--accent-light);
+    border-left: 3px solid var(--accent);
+    padding-left: 13px;
+  }
+
+  .flag {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 28px;
+    text-align: center;
+  }
+
+  .country-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .country-code {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-weight: 400;
+  }
+
+  .no-results {
+    padding: 28px;
+    text-align: center;
+    color: var(--text-dim);
+    font-size: 13px;
+  }
+
+  /* ── RESULT PANEL ── */
+  .result-panel {
+    margin-top: 18px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1.5px solid var(--border);
+    display: none;
+    animation: popIn 0.3s cubic-bezier(0.34,1.3,0.64,1);
+  }
+
+  .result-panel.show { display: block; }
+
+  .result-header {
+    background: linear-gradient(90deg, #f8faff, #f0f4ff);
+    padding: 14px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-header .flag-big { font-size: 30px; }
+
+  .result-header .country-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .result-header .country-region {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 1px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+  }
+
+  .result-item {
+    padding: 16px 18px;
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .result-item:nth-child(2) { border-right: none; }
+  .result-item:nth-child(3) { border-right: 1px solid var(--border); border-bottom: none; }
+  .result-item:nth-child(4) { border-right: none; border-bottom: none; }
+
+  .result-item-icon { font-size: 18px; margin-bottom: 6px; }
+
+  .result-item-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+
+  .result-item-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .result-item-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .result-item-value.tz { color: var(--accent); }
+  .result-item-value.currency { color: var(--accent2); }
+
+  /* Live clock */
+  .live-clock {
+    background: var(--accent-light);
+    border-top: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .live-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  .live-time {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .live-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: right;
+  }
+
+  /* CTA Button */
+  .btn-confirm {
+    display: block;
+    width: 100%;
+    margin-top: 18px;
+    padding: 14px;
+    background: var(--accent);
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+    box-shadow: 0 4px 14px rgba(37,99,235,0.3);
+    letter-spacing: 0.01em;
+  }
+
+  .btn-confirm:hover {
+    background: #1d4ed8;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(37,99,235,0.4);
+  }
+
+  .btn-confirm:disabled {
+    background: #94a3b8;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── SUCCESS STATE ── */
+  .success-screen {
+    display: none;
+    text-align: center;
+    padding: 40px 32px;
+    animation: popIn 0.4s cubic-bezier(0.34,1.3,0.64,1);
+  }
+
+  .success-screen.show { display: block; }
+  .modal-body.hidden { display: none; }
+
+  .success-icon { font-size: 52px; margin-bottom: 16px; }
+
+  .success-screen h3 {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 8px;
+  }
+
+  .success-screen p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-bottom: 24px;
+  }
+
+  .success-chips {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .chip.tz { background: var(--accent-light); color: var(--accent); }
+  .chip.currency { background: var(--accent2-light); color: var(--accent2); }
+  .chip.country { background: #fef9ec; color: #92400e; border: 1px solid #fde68a; }
+
+  .btn-change {
+    font-size: 13px;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: underline;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  .btn-change:hover { color: var(--accent); }
+
+  /* Animations */
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(30px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes popIn {
+    from { opacity: 0; transform: scale(0.94); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Dev panel */
+  .dev-panel {
+    position: fixed;
+    bottom: 20px; left: 20px;
+    background: #0f172a;
+    color: #94a3b8;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-family: monospace;
+    font-size: 11px;
+    max-width: 300px;
+    z-index: 999;
+    border: 1px solid #1e293b;
+  }
+
+  .dev-panel strong { color: #22d3ee; display: block; margin-bottom: 6px; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .dev-panel pre { white-space: pre-wrap; color: #a5f3fc; font-size: 10px; }
+</style>
 </head>
 <body>
-  <h1>🌍 Pro Config: Country → Auto-Timezone/Currency</h1>
-  <p><strong>USA Ready:</strong> Handles 11 timezones + state suggestions!</p>
 
-  <div>
-    <label><strong>🏠 Country of Origin:</strong><br>
-      <select id="countrySelect" onchange="loadCountryData()">
-        <option value="">🔄 Loading 250+ countries...</option>
-      </select>
-    </label>
-    <br>
-    <button onclick="autoDetectUser()">🎯 Auto-Detect My Location</button>
-  </div>
+<!-- Simulated site background -->
+<div style="position:fixed;inset:0;background:linear-gradient(135deg,#e0e7ff 0%,#f0fdf4 50%,#fef9ec 100%);z-index:-1"></div>
 
-  <div id="info" class="info" style="display:none;">
-    <div id="countryFlag" class="flag"></div>
-    <strong>📍 Code:</strong> <span id="countryCode"></span><br>
-    <strong>💰 Currency:</strong> <span id="currency"></span><br>
-    <strong>🕐 Timezone:</strong> 
-    <select id="timeZoneSelect" onchange="convertTime()"></select>
-    <div id="usaNote" class="usa-note" style="display:none;">
-      <strong>🇺🇸 USA?</strong> Pick your state/city timezone (11 total)
+<!-- MODAL OVERLAY -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+
+    <div class="modal-top">
+      <h2>Welcome! Where are you from?</h2>
+      <p>Select your country to personalise your experience with the correct time zone and currency.</p>
     </div>
-  </div>
 
-  <div id="result"></div>
+    <!-- Selection UI -->
+    <div class="modal-body" id="selectionBody">
+      <div class="search-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="countrySearch" placeholder="Search country..." autocomplete="off" />
+      </div>
 
-  <script>
-    let currentCountryData = null;
+      <div class="country-list" id="countryList"></div>
 
-    // US State → Timezone mapping
-    const usStateTimezones = {
-      "Alabama": "America/Chicago",
-      "Alaska": "America/Anchorage",
-      "Arizona": "America/Phoenix",
-      "California": "America/Los_Angeles",
-      "New York": "America/New_York",
-      "Texas": "America/Chicago",
-      "Florida": "America/New_York",
-      "Illinois": "America/Chicago"
-    }[code_file:1];
-
-    async function loadCountries() {
-      try {
-        const res = await fetch('https://restcountries.com/v3.1/all?fields=name,cca2,cca3,flag,currencies,timezones');
-        const countries = await res.json();
-        
-        const select = document.getElementById('countrySelect');
-        select.innerHTML = '<option value="">Select Country</option>';
-        
-        countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
-        
-        countries.forEach(country => {
-          const option = document.createElement('option');
-          option.value = country.cca2;
-          option.textContent = `${country.flag} ${country.name.common}`;
-          select.appendChild(option);
-        });
-        
-        autoDetectUser();  // Try auto-detect on load
-      } catch (err) {
-        console.error('Load failed:', err);
-      }
-    }
-
-    async function loadCountryData() {
-      const countryCode = document.getElementById('countrySelect').value;
-      const infoDiv = document.getElementById('info');
-      
-      if (!countryCode) {
-        infoDiv.style.display = 'none';
-        return;
-      }
-      
-      try {
-        infoDiv.classList.add('loading');
-        const res = await fetch(`https://restcountries.com/v3.1/alpha/${countryCode}?fields=name,cca2,cca3,flag,currencies,timezones`);
-        const [country] = await res.json();
-        currentCountryData = country;
-        
-        document.getElementById('countryFlag').innerHTML = country.flag;
-        document.getElementById('countryCode').textContent = `${country.cca2} / ${country.cca3}`;
-        
-        // Currency
-        const currencies = country.currencies;
-        document.getElementById('currency').textContent = currencies ? 
-          Object.entries(currencies).map(([k,v]) => `${v.name} (${k})`).join(', ') : 'N/A';
-        
-        // Timezones - auto-select first
-        const tzs = country.timezones || [];
-        const tzSelect = document.getElementById('timeZoneSelect');
-        tzSelect.innerHTML = '';
-        tzs.forEach((tz, i) => {
-          const option = document.createElement('option');
-          option.value = tz;
-          option.textContent = tz;
-          if (i === 0) option.selected = true;
-          tzSelect.appendChild(option);
-        });
-        
-        // USA note
-        document.getElementById('usaNote').style.display = countryCode === 'US' ? 'block' : 'none';
-        
-        infoDiv.style.display = 'block';
-        infoDiv.classList.remove('loading');
-        convertTime();
-        
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    function convertTime() {
-      if (!currentCountryData?.timezones?.length) return;
-      
-      const utcNow = new Date();
-      const tz = document.getElementById('timeZoneSelect').value;
-      
-      const local = utcNow.toLocaleString('en-GB', {
-        timeZone: tz,
-        year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit',
-        timeZoneName: 'short'
-      });
-      
-      document.getElementById('result').innerHTML = `
-        <div class="info">
-          <strong>🌐 UTC:</strong> ${utcNow.toISOString().slice(0,19).replace('T',' ')}Z<br>
-          <strong>📱 ${tz}:</strong> ${local}<br>
-          <span class="status">✅ ${currentCountryData.flag} ${currentCountryData.name.common} Configured</span>
+      <!-- Auto-resolved result -->
+      <div class="result-panel" id="resultPanel">
+        <div class="result-header">
+          <div class="flag-big" id="resFlagBig">🏳</div>
+          <div>
+            <div class="country-label" id="resCountryName">—</div>
+            <div class="country-region" id="resRegion">—</div>
+          </div>
         </div>
-      `;
-    }
+        <div class="result-grid">
+          <div class="result-item">
+            <div class="result-item-icon">🌐</div>
+            <div class="result-item-label">Timezone</div>
+            <div class="result-item-value tz" id="resTZ">—</div>
+            <div class="result-item-sub" id="resTZOffset">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-icon">💰</div>
+            <div class="result-item-label">Currency</div>
+            <div class="result-item-value currency" id="resCurrency">—</div>
+            <div class="result-item-sub" id="resCurrencySymbol">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-icon">🏷</div>
+            <div class="result-item-label">Currency Format</div>
+            <div class="result-item-value" id="resFmt1" style="font-size:13px;color:var(--accent2)">—</div>
+            <div class="result-item-sub" id="resFmt2">—</div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-icon">📍</div>
+            <div class="result-item-label">Locale</div>
+            <div class="result-item-value" id="resLocale" style="font-size:13px">—</div>
+            <div class="result-item-sub" id="resCode">—</div>
+          </div>
+        </div>
+        <div class="live-clock">
+          <div>
+            <div class="live-label">🔴 Live Local Time</div>
+            <div class="live-time" id="liveClock">—</div>
+          </div>
+          <div class="live-date" id="liveDate">—</div>
+        </div>
+      </div>
 
-    // IP Auto-detect (free)
-    async function autoDetectUser() {
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        
-        const country = data.country_code;
-        if (country && document.querySelector(`#countrySelect option[value="${country}"]`)) {
-          document.getElementById('countrySelect').value = country;
-          await loadCountryData();
-          
-          // Suggest city timezone
-          const cityTz = data.timezone;
-          const tzOption = document.querySelector(`#timeZoneSelect option[value="${cityTz}"]`);
-          if (tzOption) {
-            tzOption.selected = true;
-            convertTime();
-          }
-        }
-      } catch (e) {
-        console.log('Auto-detect unavailable');
-      }
-    }
+      <button class="btn-confirm" id="btnConfirm" disabled onclick="confirmSelection()">
+        Select Country to Continue →
+      </button>
+    </div>
 
-    loadCountries();
-  </script>
+    <!-- Success screen -->
+    <div class="success-screen" id="successScreen">
+      <div class="success-icon">✅</div>
+      <h3 id="successTitle">All set!</h3>
+      <p id="successMsg">Your preferences have been saved and applied across the platform.</p>
+      <div class="success-chips" id="successChips"></div>
+      <button class="btn-change" onclick="resetSelection()">Change country</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- Dev state display -->
+<div class="dev-panel">
+  <strong>🛠 window.__userConfig (live state)</strong>
+  <pre id="devOutput">null</pre>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// COUNTRY → TIMEZONE + CURRENCY MAP
+// Primary timezone per country (IANA), currency (ISO 4217), locale, flag emoji
+// ─────────────────────────────────────────────────────────────────────────────
+const COUNTRIES = [
+  { name:"Afghanistan",          code:"AF", flag:"🇦🇫", timezone:"Asia/Kabul",           tzLabel:"AFT (UTC+4:30)",  currency:"AFN", symbol:"؋",    locale:"ps-AF", region:"Asia" },
+  { name:"Albania",              code:"AL", flag:"🇦🇱", timezone:"Europe/Tirane",         tzLabel:"CET (UTC+1)",     currency:"ALL", symbol:"L",     locale:"sq-AL", region:"Europe" },
+  { name:"Algeria",              code:"DZ", flag:"🇩🇿", timezone:"Africa/Algiers",         tzLabel:"CET (UTC+1)",     currency:"DZD", symbol:"دج",   locale:"ar-DZ", region:"Africa" },
+  { name:"Angola",               code:"AO", flag:"🇦🇴", timezone:"Africa/Luanda",          tzLabel:"WAT (UTC+1)",     currency:"AOA", symbol:"Kz",    locale:"pt-AO", region:"Africa" },
+  { name:"Argentina",            code:"AR", flag:"🇦🇷", timezone:"America/Argentina/Buenos_Aires", tzLabel:"ART (UTC−3)", currency:"ARS", symbol:"$", locale:"es-AR", region:"South America" },
+  { name:"Australia",            code:"AU", flag:"🇦🇺", timezone:"Australia/Sydney",       tzLabel:"AEST (UTC+10)",   currency:"AUD", symbol:"A$",    locale:"en-AU", region:"Oceania" },
+  { name:"Austria",              code:"AT", flag:"🇦🇹", timezone:"Europe/Vienna",          tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"de-AT", region:"Europe" },
+  { name:"Bangladesh",           code:"BD", flag:"🇧🇩", timezone:"Asia/Dhaka",             tzLabel:"BST (UTC+6)",     currency:"BDT", symbol:"৳",    locale:"bn-BD", region:"Asia" },
+  { name:"Belgium",              code:"BE", flag:"🇧🇪", timezone:"Europe/Brussels",        tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"nl-BE", region:"Europe" },
+  { name:"Brazil",               code:"BR", flag:"🇧🇷", timezone:"America/Sao_Paulo",      tzLabel:"BRT (UTC−3)",     currency:"BRL", symbol:"R$",    locale:"pt-BR", region:"South America" },
+  { name:"Cameroon",             code:"CM", flag:"🇨🇲", timezone:"Africa/Douala",          tzLabel:"WAT (UTC+1)",     currency:"XAF", symbol:"FCFA",  locale:"fr-CM", region:"Africa" },
+  { name:"Canada",               code:"CA", flag:"🇨🇦", timezone:"America/Toronto",        tzLabel:"EST (UTC−5)",     currency:"CAD", symbol:"CA$",   locale:"en-CA", region:"North America" },
+  { name:"Chile",                code:"CL", flag:"🇨🇱", timezone:"America/Santiago",       tzLabel:"CLT (UTC−4)",     currency:"CLP", symbol:"$",     locale:"es-CL", region:"South America" },
+  { name:"China",                code:"CN", flag:"🇨🇳", timezone:"Asia/Shanghai",          tzLabel:"CST (UTC+8)",     currency:"CNY", symbol:"¥",     locale:"zh-CN", region:"Asia" },
+  { name:"Colombia",             code:"CO", flag:"🇨🇴", timezone:"America/Bogota",         tzLabel:"COT (UTC−5)",     currency:"COP", symbol:"$",     locale:"es-CO", region:"South America" },
+  { name:"Congo (DRC)",          code:"CD", flag:"🇨🇩", timezone:"Africa/Kinshasa",        tzLabel:"WAT (UTC+1)",     currency:"CDF", symbol:"FC",    locale:"fr-CD", region:"Africa" },
+  { name:"Côte d'Ivoire",        code:"CI", flag:"🇨🇮", timezone:"Africa/Abidjan",         tzLabel:"GMT (UTC+0)",     currency:"XOF", symbol:"CFA",   locale:"fr-CI", region:"Africa" },
+  { name:"Czech Republic",       code:"CZ", flag:"🇨🇿", timezone:"Europe/Prague",          tzLabel:"CET (UTC+1)",     currency:"CZK", symbol:"Kč",   locale:"cs-CZ", region:"Europe" },
+  { name:"Denmark",              code:"DK", flag:"🇩🇰", timezone:"Europe/Copenhagen",      tzLabel:"CET (UTC+1)",     currency:"DKK", symbol:"kr",    locale:"da-DK", region:"Europe" },
+  { name:"Egypt",                code:"EG", flag:"🇪🇬", timezone:"Africa/Cairo",           tzLabel:"EET (UTC+2)",     currency:"EGP", symbol:"£",     locale:"ar-EG", region:"Africa" },
+  { name:"Ethiopia",             code:"ET", flag:"🇪🇹", timezone:"Africa/Addis_Ababa",     tzLabel:"EAT (UTC+3)",     currency:"ETB", symbol:"Br",    locale:"am-ET", region:"Africa" },
+  { name:"Finland",              code:"FI", flag:"🇫🇮", timezone:"Europe/Helsinki",        tzLabel:"EET (UTC+2)",     currency:"EUR", symbol:"€",     locale:"fi-FI", region:"Europe" },
+  { name:"France",               code:"FR", flag:"🇫🇷", timezone:"Europe/Paris",           tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"fr-FR", region:"Europe" },
+  { name:"Germany",              code:"DE", flag:"🇩🇪", timezone:"Europe/Berlin",          tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"de-DE", region:"Europe" },
+  { name:"Ghana",                code:"GH", flag:"🇬🇭", timezone:"Africa/Accra",           tzLabel:"GMT (UTC+0)",     currency:"GHS", symbol:"₵",    locale:"ak-GH", region:"Africa" },
+  { name:"Greece",               code:"GR", flag:"🇬🇷", timezone:"Europe/Athens",          tzLabel:"EET (UTC+2)",     currency:"EUR", symbol:"€",     locale:"el-GR", region:"Europe" },
+  { name:"Hong Kong",            code:"HK", flag:"🇭🇰", timezone:"Asia/Hong_Kong",         tzLabel:"HKT (UTC+8)",     currency:"HKD", symbol:"HK$",   locale:"zh-HK", region:"Asia" },
+  { name:"India",                code:"IN", flag:"🇮🇳", timezone:"Asia/Kolkata",           tzLabel:"IST (UTC+5:30)",  currency:"INR", symbol:"₹",    locale:"hi-IN", region:"Asia" },
+  { name:"Indonesia",            code:"ID", flag:"🇮🇩", timezone:"Asia/Jakarta",           tzLabel:"WIB (UTC+7)",     currency:"IDR", symbol:"Rp",    locale:"id-ID", region:"Asia" },
+  { name:"Iran",                 code:"IR", flag:"🇮🇷", timezone:"Asia/Tehran",            tzLabel:"IRST (UTC+3:30)", currency:"IRR", symbol:"﷼",   locale:"fa-IR", region:"Asia" },
+  { name:"Iraq",                 code:"IQ", flag:"🇮🇶", timezone:"Asia/Baghdad",           tzLabel:"AST (UTC+3)",     currency:"IQD", symbol:"ع.د",  locale:"ar-IQ", region:"Asia" },
+  { name:"Ireland",              code:"IE", flag:"🇮🇪", timezone:"Europe/Dublin",          tzLabel:"GMT (UTC+0)",     currency:"EUR", symbol:"€",     locale:"en-IE", region:"Europe" },
+  { name:"Israel",               code:"IL", flag:"🇮🇱", timezone:"Asia/Jerusalem",         tzLabel:"IST (UTC+2)",     currency:"ILS", symbol:"₪",    locale:"he-IL", region:"Asia" },
+  { name:"Italy",                code:"IT", flag:"🇮🇹", timezone:"Europe/Rome",            tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"it-IT", region:"Europe" },
+  { name:"Japan",                code:"JP", flag:"🇯🇵", timezone:"Asia/Tokyo",             tzLabel:"JST (UTC+9)",     currency:"JPY", symbol:"¥",     locale:"ja-JP", region:"Asia" },
+  { name:"Jordan",               code:"JO", flag:"🇯🇴", timezone:"Asia/Amman",             tzLabel:"EET (UTC+2)",     currency:"JOD", symbol:"JD",    locale:"ar-JO", region:"Asia" },
+  { name:"Kenya",                code:"KE", flag:"🇰🇪", timezone:"Africa/Nairobi",         tzLabel:"EAT (UTC+3)",     currency:"KES", symbol:"KSh",   locale:"sw-KE", region:"Africa" },
+  { name:"Kuwait",               code:"KW", flag:"🇰🇼", timezone:"Asia/Kuwait",            tzLabel:"AST (UTC+3)",     currency:"KWD", symbol:"KD",    locale:"ar-KW", region:"Asia" },
+  { name:"Malaysia",             code:"MY", flag:"🇲🇾", timezone:"Asia/Kuala_Lumpur",      tzLabel:"MYT (UTC+8)",     currency:"MYR", symbol:"RM",    locale:"ms-MY", region:"Asia" },
+  { name:"Mexico",               code:"MX", flag:"🇲🇽", timezone:"America/Mexico_City",    tzLabel:"CST (UTC−6)",     currency:"MXN", symbol:"$",     locale:"es-MX", region:"North America" },
+  { name:"Morocco",              code:"MA", flag:"🇲🇦", timezone:"Africa/Casablanca",      tzLabel:"WET (UTC+0)",     currency:"MAD", symbol:"MAD",   locale:"ar-MA", region:"Africa" },
+  { name:"Netherlands",          code:"NL", flag:"🇳🇱", timezone:"Europe/Amsterdam",       tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"nl-NL", region:"Europe" },
+  { name:"New Zealand",          code:"NZ", flag:"🇳🇿", timezone:"Pacific/Auckland",       tzLabel:"NZST (UTC+12)",   currency:"NZD", symbol:"NZ$",   locale:"en-NZ", region:"Oceania" },
+  { name:"Nigeria",              code:"NG", flag:"🇳🇬", timezone:"Africa/Lagos",           tzLabel:"WAT (UTC+1)",     currency:"NGN", symbol:"₦",    locale:"en-NG", region:"Africa" },
+  { name:"Norway",               code:"NO", flag:"🇳🇴", timezone:"Europe/Oslo",            tzLabel:"CET (UTC+1)",     currency:"NOK", symbol:"kr",    locale:"nb-NO", region:"Europe" },
+  { name:"Pakistan",             code:"PK", flag:"🇵🇰", timezone:"Asia/Karachi",           tzLabel:"PKT (UTC+5)",     currency:"PKR", symbol:"₨",    locale:"ur-PK", region:"Asia" },
+  { name:"Peru",                 code:"PE", flag:"🇵🇪", timezone:"America/Lima",           tzLabel:"PET (UTC−5)",     currency:"PEN", symbol:"S/.",   locale:"es-PE", region:"South America" },
+  { name:"Philippines",          code:"PH", flag:"🇵🇭", timezone:"Asia/Manila",            tzLabel:"PHT (UTC+8)",     currency:"PHP", symbol:"₱",    locale:"fil-PH", region:"Asia" },
+  { name:"Poland",               code:"PL", flag:"🇵🇱", timezone:"Europe/Warsaw",          tzLabel:"CET (UTC+1)",     currency:"PLN", symbol:"zł",   locale:"pl-PL", region:"Europe" },
+  { name:"Portugal",             code:"PT", flag:"🇵🇹", timezone:"Europe/Lisbon",          tzLabel:"WET (UTC+0)",     currency:"EUR", symbol:"€",     locale:"pt-PT", region:"Europe" },
+  { name:"Qatar",                code:"QA", flag:"🇶🇦", timezone:"Asia/Qatar",             tzLabel:"AST (UTC+3)",     currency:"QAR", symbol:"﷼",   locale:"ar-QA", region:"Asia" },
+  { name:"Romania",              code:"RO", flag:"🇷🇴", timezone:"Europe/Bucharest",       tzLabel:"EET (UTC+2)",     currency:"RON", symbol:"lei",   locale:"ro-RO", region:"Europe" },
+  { name:"Russia",               code:"RU", flag:"🇷🇺", timezone:"Europe/Moscow",          tzLabel:"MSK (UTC+3)",     currency:"RUB", symbol:"₽",    locale:"ru-RU", region:"Europe/Asia" },
+  { name:"Rwanda",               code:"RW", flag:"🇷🇼", timezone:"Africa/Kigali",          tzLabel:"CAT (UTC+2)",     currency:"RWF", symbol:"Fr",    locale:"rw-RW", region:"Africa" },
+  { name:"Saudi Arabia",         code:"SA", flag:"🇸🇦", timezone:"Asia/Riyadh",            tzLabel:"AST (UTC+3)",     currency:"SAR", symbol:"﷼",   locale:"ar-SA", region:"Asia" },
+  { name:"Senegal",              code:"SN", flag:"🇸🇳", timezone:"Africa/Dakar",           tzLabel:"GMT (UTC+0)",     currency:"XOF", symbol:"CFA",   locale:"fr-SN", region:"Africa" },
+  { name:"Singapore",            code:"SG", flag:"🇸🇬", timezone:"Asia/Singapore",         tzLabel:"SGT (UTC+8)",     currency:"SGD", symbol:"S$",    locale:"en-SG", region:"Asia" },
+  { name:"South Africa",         code:"ZA", flag:"🇿🇦", timezone:"Africa/Johannesburg",    tzLabel:"SAST (UTC+2)",    currency:"ZAR", symbol:"R",     locale:"en-ZA", region:"Africa" },
+  { name:"South Korea",          code:"KR", flag:"🇰🇷", timezone:"Asia/Seoul",             tzLabel:"KST (UTC+9)",     currency:"KRW", symbol:"₩",    locale:"ko-KR", region:"Asia" },
+  { name:"Spain",                code:"ES", flag:"🇪🇸", timezone:"Europe/Madrid",          tzLabel:"CET (UTC+1)",     currency:"EUR", symbol:"€",     locale:"es-ES", region:"Europe" },
+  { name:"Sweden",               code:"SE", flag:"🇸🇪", timezone:"Europe/Stockholm",       tzLabel:"CET (UTC+1)",     currency:"SEK", symbol:"kr",    locale:"sv-SE", region:"Europe" },
+  { name:"Switzerland",          code:"CH", flag:"🇨🇭", timezone:"Europe/Zurich",          tzLabel:"CET (UTC+1)",     currency:"CHF", symbol:"Fr",    locale:"de-CH", region:"Europe" },
+  { name:"Taiwan",               code:"TW", flag:"🇹🇼", timezone:"Asia/Taipei",            tzLabel:"CST (UTC+8)",     currency:"TWD", symbol:"NT$",   locale:"zh-TW", region:"Asia" },
+  { name:"Tanzania",             code:"TZ", flag:"🇹🇿", timezone:"Africa/Dar_es_Salaam",   tzLabel:"EAT (UTC+3)",     currency:"TZS", symbol:"TSh",   locale:"sw-TZ", region:"Africa" },
+  { name:"Thailand",             code:"TH", flag:"🇹🇭", timezone:"Asia/Bangkok",           tzLabel:"ICT (UTC+7)",     currency:"THB", symbol:"฿",    locale:"th-TH", region:"Asia" },
+  { name:"Turkey",               code:"TR", flag:"🇹🇷", timezone:"Europe/Istanbul",        tzLabel:"TRT (UTC+3)",     currency:"TRY", symbol:"₺",    locale:"tr-TR", region:"Asia/Europe" },
+  { name:"Uganda",               code:"UG", flag:"🇺🇬", timezone:"Africa/Kampala",         tzLabel:"EAT (UTC+3)",     currency:"UGX", symbol:"USh",   locale:"sw-UG", region:"Africa" },
+  { name:"Ukraine",              code:"UA", flag:"🇺🇦", timezone:"Europe/Kyiv",            tzLabel:"EET (UTC+2)",     currency:"UAH", symbol:"₴",    locale:"uk-UA", region:"Europe" },
+  { name:"United Arab Emirates", code:"AE", flag:"🇦🇪", timezone:"Asia/Dubai",             tzLabel:"GST (UTC+4)",     currency:"AED", symbol:"د.إ",  locale:"ar-AE", region:"Asia" },
+  { name:"United Kingdom",       code:"GB", flag:"🇬🇧", timezone:"Europe/London",          tzLabel:"GMT (UTC+0)",     currency:"GBP", symbol:"£",     locale:"en-GB", region:"Europe" },
+  { name:"United States",        code:"US", flag:"🇺🇸", timezone:"America/New_York",       tzLabel:"EST (UTC−5)",     currency:"USD", symbol:"$",     locale:"en-US", region:"North America" },
+  { name:"Venezuela",            code:"VE", flag:"🇻🇪", timezone:"America/Caracas",        tzLabel:"VET (UTC−4)",     currency:"VES", symbol:"Bs.S",  locale:"es-VE", region:"South America" },
+  { name:"Vietnam",              code:"VN", flag:"🇻🇳", timezone:"Asia/Ho_Chi_Minh",       tzLabel:"ICT (UTC+7)",     currency:"VND", symbol:"₫",    locale:"vi-VN", region:"Asia" },
+  { name:"Zambia",               code:"ZM", flag:"🇿🇲", timezone:"Africa/Lusaka",          tzLabel:"CAT (UTC+2)",     currency:"ZMW", symbol:"ZK",    locale:"bem-ZM", region:"Africa" },
+  { name:"Zimbabwe",             code:"ZW", flag:"🇿🇼", timezone:"Africa/Harare",          tzLabel:"CAT (UTC+2)",     currency:"ZWL", symbol:"Z$",    locale:"en-ZW", region:"Africa" },
+];
+
+// ── STATE ──────────────────────────────────────────────────────────────────────
+let selected = null;
+let clockInterval = null;
+
+// Expose globally for your app to read
+window.__userConfig = null;
+
+// ── RENDER LIST ────────────────────────────────────────────────────────────────
+function renderList(data) {
+  const list = document.getElementById('countryList');
+  list.innerHTML = '';
+  if (!data.length) {
+    list.innerHTML = `<div class="no-results">No countries found</div>`;
+    return;
+  }
+  data.forEach(c => {
+    const div = document.createElement('div');
+    div.className = 'country-option' + (selected && selected.code === c.code ? ' selected' : '');
+    div.innerHTML = `
+      <span class="flag">${c.flag}</span>
+      <span class="country-name">${c.name}</span>
+      <span class="country-code">${c.code}</span>
+    `;
+    div.onclick = () => selectCountry(c);
+    list.appendChild(div);
+  });
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────────────────────
+document.getElementById('countrySearch').addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  renderList(q ? COUNTRIES.filter(c =>
+    c.name.toLowerCase().includes(q) ||
+    c.code.toLowerCase().includes(q) ||
+    c.currency.toLowerCase().includes(q) ||
+    c.region.toLowerCase().includes(q)
+  ) : COUNTRIES);
+});
+
+// ── SELECT COUNTRY → AUTO RESOLVE ─────────────────────────────────────────────
+function selectCountry(country) {
+  selected = country;
+  renderList(document.getElementById('countrySearch').value.toLowerCase().trim()
+    ? COUNTRIES.filter(c => c.name.toLowerCase().includes(document.getElementById('countrySearch').value.toLowerCase()))
+    : COUNTRIES
+  );
+
+  // Show result panel
+  const panel = document.getElementById('resultPanel');
+  panel.classList.add('show');
+
+  // Populate auto-resolved fields
+  document.getElementById('resFlagBig').textContent = country.flag;
+  document.getElementById('resCountryName').textContent = country.name;
+  document.getElementById('resRegion').textContent = country.region;
+  document.getElementById('resTZ').textContent = country.timezone;
+  document.getElementById('resTZOffset').textContent = country.tzLabel;
+  document.getElementById('resCurrency').textContent = country.currency;
+  document.getElementById('resCurrencySymbol').textContent = `Symbol: ${country.symbol} · ISO 4217`;
+  document.getElementById('resLocale').textContent = country.locale;
+  document.getElementById('resCode').textContent = `Country Code: ${country.code}`;
+
+  // Currency format samples
+  const fmt = (n) => {
+    try {
+      return new Intl.NumberFormat(country.locale, { style:'currency', currency: country.currency }).format(n);
+    } catch(e) { return `${country.symbol}${n.toLocaleString()}`; }
+  };
+  document.getElementById('resFmt1').textContent = fmt(1000);
+  document.getElementById('resFmt2').textContent = `e.g. ${fmt(25000)} · ${fmt(1234567.89)}`;
+
+  // Live clock
+  if (clockInterval) clearInterval(clockInterval);
+  function tick() {
+    try {
+      const now = new Date();
+      document.getElementById('liveClock').textContent = now.toLocaleTimeString('en-US', { timeZone: country.timezone, hour12: false });
+      document.getElementById('liveDate').textContent = now.toLocaleDateString('en-US', { timeZone: country.timezone, weekday:'short', year:'numeric', month:'short', day:'numeric' });
+    } catch(e) {}
+  }
+  tick();
+  clockInterval = setInterval(tick, 1000);
+
+  // Enable confirm button
+  const btn = document.getElementById('btnConfirm');
+  btn.disabled = false;
+  btn.textContent = `Confirm — ${country.name} →`;
+
+  // Scroll panel into view smoothly
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── CONFIRM ────────────────────────────────────────────────────────────────────
+function confirmSelection() {
+  if (!selected) return;
+
+  // Save to global state (use anywhere in your app)
+  window.__userConfig = {
+    country: { name: selected.name, code: selected.code, flag: selected.flag, region: selected.region },
+    timezone: { id: selected.timezone, label: selected.tzLabel },
+    currency: { code: selected.currency, symbol: selected.symbol },
+    locale: selected.locale,
+    setAt: new Date().toISOString()
+  };
+
+  // Update dev panel
+  document.getElementById('devOutput').textContent = JSON.stringify(window.__userConfig, null, 2);
+
+  // Show success screen
+  document.getElementById('selectionBody').classList.add('hidden');
+  const ss = document.getElementById('successScreen');
+  ss.classList.add('show');
+
+  document.getElementById('successTitle').textContent = `Welcome from ${selected.name}! ${selected.flag}`;
+  document.getElementById('successMsg').textContent = `Your timezone (${selected.timezone}) and currency (${selected.currency}) have been automatically applied to your session.`;
+
+  document.getElementById('successChips').innerHTML = `
+    <div class="chip country">${selected.flag} ${selected.name}</div>
+    <div class="chip tz">🌐 ${selected.timezone}</div>
+    <div class="chip currency">💰 ${selected.currency} ${selected.symbol}</div>
+  `;
+
+  if (clockInterval) clearInterval(clockInterval);
+
+  // Dispatch event so your app can react
+  window.dispatchEvent(new CustomEvent('userConfigSet', { detail: window.__userConfig }));
+}
+
+// ── RESET ──────────────────────────────────────────────────────────────────────
+function resetSelection() {
+  selected = null;
+  window.__userConfig = null;
+  document.getElementById('devOutput').textContent = 'null';
+  document.getElementById('countrySearch').value = '';
+  document.getElementById('resultPanel').classList.remove('show');
+  document.getElementById('selectionBody').classList.remove('hidden');
+  document.getElementById('successScreen').classList.remove('show');
+  const btn = document.getElementById('btnConfirm');
+  btn.disabled = true;
+  btn.textContent = 'Select Country to Continue →';
+  renderList(COUNTRIES);
+}
+
+// ── LISTEN for your app ───────────────────────────────────────────────────────
+window.addEventListener('userConfigSet', (e) => {
+  // In your existing app, listen to this event:
+  // window.addEventListener('userConfigSet', (e) => { applyUserConfig(e.detail); });
+  console.log('✅ userConfigSet fired:', e.detail);
+});
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+renderList(COUNTRIES);
+</script>
 </body>
 </html>
