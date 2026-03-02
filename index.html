@@ -3,25 +3,25 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Auto Country → Timezone → Currency</title>
+  <title>Pro Country/Timezone Config (USA Multi-Zone Ready)</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
+    body { font-family: system-ui, sans-serif; max-width: 1000px; margin: 0 auto; padding: 2rem; line-height: 1.6; }
     select, button { padding: 0.75rem 1rem; margin: 0.5rem 0.25rem 0 0; border: 1px solid #d1d5db; border-radius: 0.5rem; font-size: 1rem; }
-    button { background: #10b981; color: white; border: none; cursor: pointer; }
-    button:hover { background: #059669; }
-    .info { background: #ecfdf5; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #10b981; }
+    button { background: #8b5cf6; color: white; border: none; cursor: pointer; }
+    button:hover { background: #7c3aed; }
+    .info { background: #f3e8ff; padding: 1.5rem; border-radius: 0.75rem; margin: 1.5rem 0; border-left: 4px solid #8b5cf6; }
+    .usa-note { background: #fef3c7; border-left-color: #f59e0b; margin-top: 1rem; padding: 1rem; border-radius: 0.5rem; }
     .loading { opacity: 0.6; }
-    code { background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-family: 'Courier New', monospace; font-size: 0.875rem; }
+    code { background: #f8fafc; padding: 0.25rem 0.5rem; border-radius: 0.375rem; font-family: 'Courier New', monospace; }
     h1 { color: #1f2937; }
-    h2 { color: #374151; border-bottom: 2px solid #10b981; padding-bottom: 0.5rem; }
-    .status { font-weight: bold; color: #059669; }
+    h2 { color: #374151; border-bottom: 2px solid #8b5cf6; padding-bottom: 0.5rem; }
     .flag { font-size: 1.5rem; margin-right: 0.5rem; }
-    .auto-updated { background: #fef3c7; border-left-color: #f59e0b; margin-top: 1rem; }
+    .status { font-weight: bold; color: #7c2d12; }
   </style>
 </head>
 <body>
-  <h1>✨ Auto-Config: Country → Timezone → Currency</h1>
-  <p>Select <strong>Country of Origin</strong> → **Instantly** shows currency, auto-selects timezone, converts time!</p>
+  <h1>🌍 Pro Config: Country → Auto-Timezone/Currency</h1>
+  <p><strong>USA Ready:</strong> Handles 11 timezones + state suggestions!</p>
 
   <div>
     <label><strong>🏠 Country of Origin:</strong><br>
@@ -29,29 +29,37 @@
         <option value="">🔄 Loading 250+ countries...</option>
       </select>
     </label>
+    <br>
+    <button onclick="autoDetectUser()">🎯 Auto-Detect My Location</button>
   </div>
 
   <div id="info" class="info" style="display:none;">
     <div id="countryFlag" class="flag"></div>
-    <strong>📍 Country Code:</strong> <span id="countryCode"></span><br>
+    <strong>📍 Code:</strong> <span id="countryCode"></span><br>
     <strong>💰 Currency:</strong> <span id="currency"></span><br>
-    <strong>🕐 Auto Timezone:</strong> 
-    <select id="timeZoneSelect" onchange="convertTime()">
-      <option>Auto-selecting...</option>
-    </select>
+    <strong>🕐 Timezone:</strong> 
+    <select id="timeZoneSelect" onchange="convertTime()"></select>
+    <div id="usaNote" class="usa-note" style="display:none;">
+      <strong>🇺🇸 USA?</strong> Pick your state/city timezone (11 total)
+    </div>
   </div>
 
-  <div id="result" class="auto-updated"></div>
-
-  <h2>🎯 Live Demo Flow</h2>
-  <ol>
-    <li>Select Ghana 🇬🇭</li>
-    <li><strong>Instant:</strong> GHS currency + "UTC" timezone selected + time converted</li>
-    <li>Change Spain 🇪🇸 → EUR + "Europe/Madrid" + new time</li>
-  </ol>
+  <div id="result"></div>
 
   <script>
     let currentCountryData = null;
+
+    // US State → Timezone mapping
+    const usStateTimezones = {
+      "Alabama": "America/Chicago",
+      "Alaska": "America/Anchorage",
+      "Arizona": "America/Phoenix",
+      "California": "America/Los_Angeles",
+      "New York": "America/New_York",
+      "Texas": "America/Chicago",
+      "Florida": "America/New_York",
+      "Illinois": "America/Chicago"
+    }[code_file:1];
 
     async function loadCountries() {
       try {
@@ -59,7 +67,7 @@
         const countries = await res.json();
         
         const select = document.getElementById('countrySelect');
-        select.innerHTML = '<option value="">Select Country of Origin</option>';
+        select.innerHTML = '<option value="">Select Country</option>';
         
         countries.sort((a, b) => a.name.common.localeCompare(b.name.common));
         
@@ -70,8 +78,9 @@
           select.appendChild(option);
         });
         
+        autoDetectUser();  // Try auto-detect on load
       } catch (err) {
-        console.error('Countries load failed:', err);
+        console.error('Load failed:', err);
       }
     }
 
@@ -81,7 +90,6 @@
       
       if (!countryCode) {
         infoDiv.style.display = 'none';
-        document.getElementById('result').innerHTML = '';
         return;
       }
       
@@ -91,37 +99,35 @@
         const [country] = await res.json();
         currentCountryData = country;
         
-        // Flag & Codes
         document.getElementById('countryFlag').innerHTML = country.flag;
         document.getElementById('countryCode').textContent = `${country.cca2} / ${country.cca3}`;
         
-        // **AUTO: Currency**
+        // Currency
         const currencies = country.currencies;
-        const currencyList = currencies ? 
-          Object.entries(currencies).map(([code, c]) => `${c.name} (${code})`).join(', ') : 
-          'N/A';
-        document.getElementById('currency').textContent = currencyList;
+        document.getElementById('currency').textContent = currencies ? 
+          Object.entries(currencies).map(([k,v]) => `${v.name} (${k})`).join(', ') : 'N/A';
         
-        // **AUTO: Timezone dropdown + select FIRST**
+        // Timezones - auto-select first
         const tzs = country.timezones || [];
         const tzSelect = document.getElementById('timeZoneSelect');
         tzSelect.innerHTML = '';
-        tzs.forEach((tz, index) => {
+        tzs.forEach((tz, i) => {
           const option = document.createElement('option');
           option.value = tz;
           option.textContent = tz;
-          if (index === 0) option.selected = true;  // AUTO-SELECT FIRST
+          if (i === 0) option.selected = true;
           tzSelect.appendChild(option);
         });
         
+        // USA note
+        document.getElementById('usaNote').style.display = countryCode === 'US' ? 'block' : 'none';
+        
         infoDiv.style.display = 'block';
         infoDiv.classList.remove('loading');
-        
-        // **AUTO: Convert time immediately**
         convertTime();
         
       } catch (err) {
-        console.error('Country failed:', err);
+        console.error(err);
       }
     }
 
@@ -140,15 +146,37 @@
       
       document.getElementById('result').innerHTML = `
         <div class="info">
-          <strong>🌐 UTC (Database):</strong> ${utcNow.toISOString().slice(0,19).replace('T',' ')}Z<br>
+          <strong>🌐 UTC:</strong> ${utcNow.toISOString().slice(0,19).replace('T',' ')}Z<br>
           <strong>📱 ${tz}:</strong> ${local}<br>
-          <span class="status">✅ Auto-configured from ${currentCountryData.flag} ${currentCountryData.name.common}</span><br>
-          <code>countryCode: "${currentCountryData.cca2}" → tz: "${tz}"</code>
+          <span class="status">✅ ${currentCountryData.flag} ${currentCountryData.name.common} Configured</span>
         </div>
       `;
     }
 
-    // Load on start
+    // IP Auto-detect (free)
+    async function autoDetectUser() {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        
+        const country = data.country_code;
+        if (country && document.querySelector(`#countrySelect option[value="${country}"]`)) {
+          document.getElementById('countrySelect').value = country;
+          await loadCountryData();
+          
+          // Suggest city timezone
+          const cityTz = data.timezone;
+          const tzOption = document.querySelector(`#timeZoneSelect option[value="${cityTz}"]`);
+          if (tzOption) {
+            tzOption.selected = true;
+            convertTime();
+          }
+        }
+      } catch (e) {
+        console.log('Auto-detect unavailable');
+      }
+    }
+
     loadCountries();
   </script>
 </body>
