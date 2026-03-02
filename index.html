@@ -3,68 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Global System Configuration</title>
+    <title>Global System Setup</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/choices.js/public/assets/styles/choices.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/choices.js/public/assets/scripts/choices.min.js"></script>
+    
+    <style>
+        .choices__inner { background-color: white !important; border-radius: 0.5rem !important; border: 1px solid #d1d5db !important; }
+        /* Pulse animation for the auto-detecting state */
+        .loading-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+    </style>
 </head>
-<body class="bg-gray-100 p-10">
-    <div class="max-w-md mx-auto bg-white p-8 rounded-xl shadow-lg">
-        <h2 class="text-2xl font-bold mb-6 text-gray-800">System Setup</h2>
-        
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">Select Country</label>
-            <select id="country" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                <option value="">-- Choose a Country --</option>
-                <option value="US" data-currency="USD (US Dollar)" data-zones='["America/New_York", "America/Chicago", "America/Los_Angeles"]'>United States</option>
-                <option value="GB" data-currency="GBP (British Pound)" data-zones='["Europe/London"]'>United Kingdom</option>
-                <option value="GH" data-currency="GHS (Ghanaian Cedi)" data-zones='["Africa/Accra"]'>Ghana</option>
-                <option value="DE" data-currency="EUR (Euro)" data-zones='["Europe/Berlin"]'>Germany</option>
-                <option value="JP" data-currency="JPY (Japanese Yen)" data-zones='["Asia/Tokyo"]'>Japan</option>
-            </select>
+<body class="bg-slate-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-white shadow-2xl rounded-2xl overflow-hidden">
+        <div class="bg-indigo-600 p-6">
+            <h1 class="text-white text-2xl font-bold">System Localization</h1>
+            <p id="status-msg" class="text-indigo-100 text-sm">Detecting your location...</p>
         </div>
 
-        <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700">System Currency (Auto)</label>
-            <input type="text" id="currency" readonly class="mt-1 block w-full p-2 bg-gray-50 border border-gray-200 text-gray-500 rounded-md" placeholder="Select a country first...">
-        </div>
+        <div class="p-8 space-y-6">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Country of Origin</label>
+                <select id="country-select" class="w-full"></select>
+            </div>
 
-        <div class="mb-6">
-            <label class="block text-sm font-medium text-gray-700">Available Timezones</label>
-            <select id="timezone" disabled class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-gray-50">
-                <option>Select a country first...</option>
-            </select>
-        </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Currency</label>
+                    <div id="currency-display" class="p-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-400 font-mono">---</div>
+                </div>
 
-        <button onclick="alert('System Settings Saved!')" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition">Save Configuration</button>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Timezone</label>
+                    <select id="timezone-select" disabled class="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 outline-none focus:ring-2 focus:ring-indigo-500 transition-all">
+                        <option>Detecting...</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                <p class="text-xs text-indigo-700 font-medium italic">
+                    Note: The system has automatically matched your timezone and currency based on your current location.
+                </p>
+            </div>
+
+            <button onclick="confirmSetup()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition-all shadow-lg active:scale-[0.98]">
+                Save & Continue
+            </button>
+        </div>
     </div>
 
     <script>
-        const countryEl = document.getElementById('country');
-        const currencyEl = document.getElementById('currency');
-        const timezoneEl = document.getElementById('timezone');
+        let countriesData = [];
+        let choicesInstance;
+        const countryEl = document.getElementById('country-select');
+        const currencyEl = document.getElementById('currency-display');
+        const tzSelect = document.getElementById('timezone-select');
+        const statusMsg = document.getElementById('status-msg');
 
-        countryEl.addEventListener('change', function() {
-            const selected = this.options[this.selectedIndex];
-            
-            if (this.value) {
-                // 1. Update Currency
-                currencyEl.value = selected.getAttribute('data-currency');
+        // Initialize Searchable UI
+        choicesInstance = new Choices(countryEl, { searchEnabled: true, itemSelectText: '' });
+
+        // Main logic flow
+        async function initSystem() {
+            try {
+                // 1. Fetch the data.json you uploaded to GitHub
+                const response = await fetch('data.json');
+                countriesData = await response.json();
                 
-                // 2. Update Timezones
-                const zones = JSON.parse(selected.getAttribute('data-zones'));
-                timezoneEl.innerHTML = '';
-                zones.forEach(zone => {
-                    let opt = new Option(zone, zone);
-                    timezoneEl.add(opt);
-                });
+                // 2. Populate Country Dropdown
+                const list = countriesData.map(c => ({ value: c.code, label: `${c.name} (${c.code})` }))
+                             .sort((a, b) => a.label.localeCompare(b.label));
+                choicesInstance.setChoices(list, 'value', 'label', true);
+
+                // 3. AUTO-DETECT User Location
+                const geoRes = await fetch('https://ipapi.co/json/');
+                const geoData = await geoRes.json();
                 
-                timezoneEl.disabled = false;
-                timezoneEl.classList.remove('bg-gray-50');
-            } else {
-                currencyEl.value = '';
-                timezoneEl.disabled = true;
-                timezoneEl.innerHTML = '<option>Select a country first...</option>';
+                if (geoData.country_code) {
+                    updateUI(geoData.country_code, geoData.timezone);
+                    statusMsg.innerText = `Auto-detected: ${geoData.city}, ${geoData.country_name}`;
+                }
+            } catch (err) {
+                statusMsg.innerText = "Please select your location manually.";
+                console.error("Auto-detection failed", err);
             }
+        }
+
+        function updateUI(countryCode, preferredTimezone = null) {
+            const country = countriesData.find(c => c.code === countryCode);
+            if (!country) return;
+
+            // Update Selection UI
+            choicesInstance.setChoiceByValue(country.code);
+            
+            // Update Currency
+            currencyEl.innerText = country.currency;
+            currencyEl.className = "p-3 bg-white border border-indigo-200 rounded-lg text-indigo-600 font-bold shadow-sm";
+
+            // Update Timezones
+            tzSelect.innerHTML = '';
+            country.zones.forEach(zone => {
+                let opt = new Option(zone, zone);
+                if (zone === preferredTimezone) opt.selected = true;
+                tzSelect.add(opt);
+            });
+            
+            tzSelect.disabled = false;
+            tzSelect.className = "w-full p-3 border border-indigo-300 rounded-lg bg-white outline-none focus:ring-2 focus:ring-indigo-500 transition-all";
+        }
+
+        // Handle manual changes
+        countryEl.addEventListener('change', (e) => {
+            updateUI(e.detail.value);
+            statusMsg.innerText = "Manual configuration active.";
         });
+
+        function confirmSetup() {
+            alert(`System updated to ${tzSelect.value} with currency ${currencyEl.innerText}`);
+        }
+
+        initSystem();
     </script>
 </body>
 </html>
